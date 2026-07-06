@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TechFashy — Device Finder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#120D1F;
+    --bg2:#1B1430;
+    --card:#211936;
+    --card-edge:#342A55;
+    --card-edge-soft:#2A2242;
+    --purple:#7B5CF5;
+    --purple-soft:#9D85FA;
+    --purple-dim:rgba(123,92,245,0.16);
+    --lavender:#C9BBFA;
+    --amber:#FFB648;
+    --amber-dark:#E89A2C;
+    --green:#4ADE80;
+    --red:#FF6B6B;
+    --white:#F8F6FF;
+    --muted:#8A80AC;
+    --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 90% 0%, rgba(123,92,245,0.28), transparent 45%),
+      radial-gradient(circle at 0% 100%, rgba(123,92,245,0.14), transparent 40%),
+      var(--bg);
+    font-family: var(--sans);
+    color: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+  a{ color:inherit; }
+  button{ font-family:inherit; cursor:pointer; }
+  ::selection{ background: var(--purple); color:white; }
+  :focus-visible{ outline: 2px solid var(--purple-soft); outline-offset:2px; }
+
+  .app{ max-width: 980px; margin: 0 auto; padding: 20px 18px 60px; }
+
+  /* header */
+  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:40px; height:40px; border-radius:11px; flex-shrink:0;
+    background: linear-gradient(135deg, var(--purple), #5A3FD6);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:18px; color:white;
+    box-shadow: 0 6px 16px rgba(123,92,245,0.45);
+  }
+  .brand-text .name{ font-weight:700; font-size:19px; letter-spacing:0.2px; }
+  .brand-text .sub{ font-size:11px; color:var(--muted); font-family:var(--mono); letter-spacing:1px; text-transform:uppercase; }
+  .gear-btn{
+    background:var(--card); border:1px solid var(--card-edge); color:var(--lavender);
+    width:38px; height:38px; border-radius:10px; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .live-dot{ width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px rgba(74,222,128,0.18); flex-shrink:0; }
+  .refresh-btn{
+    background:none; border:none; color:var(--muted); font-size:14px; padding:2px 4px; line-height:1;
+    margin-left:auto;
+  }
+  .refresh-btn.spinning{ animation: spin 0.7s linear infinite; display:inline-block; }
+  .connect-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background: var(--purple-dim); border:1px solid rgba(123,92,245,0.35); border-radius:12px;
+    padding:12px 14px; margin-bottom:14px; font-size:13px; color:var(--lavender);
+  }
+  .connect-banner button{
+    background:var(--purple); color:white; border:none; padding:8px 14px; border-radius:8px;
+    font-size:12.5px; font-weight:700; white-space:nowrap;
+  }
+
+  /* hero / status line */
+  .status-line{
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:8px; margin-bottom:16px;
+  }
+  h1{ font-size: clamp(24px, 5vw, 32px); font-weight:800; letter-spacing:-0.5px; line-height:1.15; margin:0; }
+  h1 span{ color: var(--amber); }
+  .meta{ font-size:12px; color:var(--muted); font-family:var(--mono); }
+
+  /* search */
+  .search-wrap{ position:relative; margin-bottom:14px; }
+  .search-wrap input[type="text"]{
+    width:100%; padding: 15px 16px 15px 46px; font-size:16px;
+    background:var(--card); border:1px solid var(--card-edge); border-radius:14px;
+    color:var(--white);
+  }
+  .search-wrap input::placeholder{ color:var(--muted); }
+  .search-icon{ position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:16px; }
+  .search-wrap input:focus{ border-color:var(--purple); }
+
+  /* filter toggle bar */
+  .filter-toggle{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--card); border:1px solid var(--card-edge); border-radius:14px;
+    padding:13px 16px; margin-bottom:12px; font-size:14px; font-weight:600;
+  }
+  .filter-toggle .count-pill{
+    background:var(--purple-dim); color:var(--purple-soft); font-size:11px; font-weight:700;
+    padding:3px 9px; border-radius:100px; margin-left:8px; font-family:var(--mono);
+  }
+  .chev{ transition: transform 0.2s ease; color:var(--muted); }
+  .chev.open{ transform: rotate(180deg); }
+
+  .filters{
+    display:none; background:var(--card); border:1px solid var(--card-edge); border-radius:14px;
+    padding:18px 16px 6px; margin-bottom:16px;
+  }
+  .filters.open{ display:block; }
+  .filter-group{ margin-bottom:16px; }
+  .filter-label{ font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--muted); font-family:var(--mono); margin-bottom:9px; display:block; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    background:var(--bg2); border:1px solid var(--card-edge); color:var(--lavender);
+    padding:8px 14px; border-radius:100px; font-size:13.5px; font-weight:600;
+    white-space:nowrap;
+  }
+  .chip.active{ background:var(--purple); border-color:var(--purple); color:white; }
+
+  select{
+    width:100%; padding:12px 14px; background:var(--bg2); border:1px solid var(--card-edge);
+    color:var(--white); border-radius:10px; font-size:14.5px; font-family:inherit; appearance:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A80AC' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position: right 14px center;
+  }
+  .price-row{ display:flex; gap:10px; align-items:center; }
+  .price-row input{
+    flex:1; min-width:0; padding:12px 12px; background:var(--bg2); border:1px solid var(--card-edge);
+    color:var(--white); border-radius:10px; font-size:14.5px; font-family:var(--mono);
+  }
+  .price-row span{ color:var(--muted); font-size:13px; }
+
+  .filter-actions{ display:flex; gap:10px; padding: 4px 0 16px; }
+  .btn-clear{
+    flex:1; background:transparent; border:1px solid var(--card-edge); color:var(--muted);
+    padding:12px; border-radius:10px; font-size:14px; font-weight:600;
+  }
+  .btn-apply{
+    flex:1; background:var(--purple); border:1px solid var(--purple); color:white;
+    padding:12px; border-radius:10px; font-size:14px; font-weight:700;
+  }
+
+  /* results */
+  .results-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .results-count{ font-size:13.5px; color:var(--lavender); }
+  .results-count strong{ color:var(--white); }
+  .sort-select{ width:auto; padding:8px 34px 8px 12px; font-size:12.5px; }
+
+  .grid{ display:grid; grid-template-columns: 1fr; gap:12px; }
+  @media (min-width: 640px){ .grid{ grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 960px){ .grid{ grid-template-columns: 1fr 1fr 1fr; } }
+
+  .device-card{
+    background: linear-gradient(180deg, var(--card), var(--bg2));
+    border:1px solid var(--card-edge); border-radius:16px; padding:18px 18px 16px;
+    display:flex; flex-direction:column;
+  }
+  .device-card .tag{ font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; }
+  .device-card .model{ font-size:19px; font-weight:700; margin-top:6px; line-height:1.3; }
+  .device-card .cond{
+    margin-top:10px; display:inline-flex; align-items:center; gap:5px; width:fit-content;
+    font-size:11.5px; font-weight:600; padding:4px 10px; border-radius:100px;
+  }
+  .cond.new{ background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3); }
+  .cond.used{ background:rgba(255,182,72,0.1); color:var(--amber); border:1px solid rgba(255,182,72,0.3); }
+  .cond::before{ content:"●"; font-size:7px; }
+
+  .ticket{
+    margin-top:16px; background: linear-gradient(135deg, var(--amber), var(--amber-dark));
+    color:#241505; border-radius: 12px 12px 12px 4px; padding:12px 14px; position:relative;
+  }
+  .ticket .hole{ position:absolute; top:-7px; left:16px; width:13px; height:13px; background:var(--bg); border-radius:50%; border:2.5px solid var(--amber-dark); }
+  .ticket .price{ font-size:20px; font-weight:800; font-family:var(--mono); letter-spacing:-0.3px; }
+
+  .empty-state{ text-align:center; padding: 60px 20px; color:var(--muted); }
+  .empty-state .big{ font-size:40px; margin-bottom:14px; }
+  .empty-state p{ font-size:14.5px; max-width:320px; margin:6px auto 0; line-height:1.5; }
+
+  footer{ margin-top: 40px; text-align:center; }
+  .update-link{ background:none; border:none; color:var(--muted); font-size:12.5px; text-decoration:underline; text-underline-offset:3px; }
+
+  /* modal */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(10,7,18,0.75);
+    align-items:flex-end; justify-content:center; z-index:50; backdrop-filter: blur(3px);
+  }
+  .modal-overlay.open{ display:flex; }
+  @media (min-width:640px){ .modal-overlay{ align-items:center; } }
+  .modal{
+    background: var(--bg2); border:1px solid var(--card-edge); width:100%; max-width:440px;
+    border-radius: 20px 20px 0 0; padding:24px 22px 28px; max-height:88vh; overflow-y:auto;
+  }
+  @media (min-width:640px){ .modal{ border-radius:20px; } }
+  .modal h3{ font-size:18px; margin:0 0 4px; }
+  .modal p.desc{ font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 20px; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12px; color:var(--lavender); margin-bottom:7px; font-weight:600; }
+  .field input[type="password"], .field input[type="file"]{
+    width:100%; padding:12px 13px; background:var(--card); border:1px solid var(--card-edge);
+    color:var(--white); border-radius:10px; font-size:14px;
+  }
+  .modal-msg{ font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:14px; display:none; }
+  .modal-msg.show{ display:block; }
+  .modal-msg.success{ background:rgba(74,222,128,0.1); color:var(--green); border:1px solid rgba(74,222,128,0.3); }
+  .modal-msg.error{ background:rgba(255,107,107,0.1); color:var(--red); border:1px solid rgba(255,107,107,0.3); }
+  .modal-actions{ display:flex; gap:10px; margin-top: 6px; }
+  .btn-cancel{ flex:1; background:transparent; border:1px solid var(--card-edge); color:var(--muted); padding:13px; border-radius:10px; font-weight:600; font-size:14px; }
+  .btn-upload{ flex:1; background:var(--purple); border:1px solid var(--purple); color:white; padding:13px; border-radius:10px; font-weight:700; font-size:14px; }
+  .btn-upload:disabled{ opacity:0.5; }
+  .spec-note{ font-size:11.5px; color:var(--muted); font-family:var(--mono); line-height:1.6; background:var(--card); border:1px solid var(--card-edge); border-radius:8px; padding:10px 12px; margin-top:4px; }
+  .divider-line{ height:1px; background:var(--card-edge); margin:20px 0 16px; }
+  .manual-fallback summary{ font-size:12.5px; color:var(--muted); cursor:pointer; }
+  .manual-fallback summary:hover{ color:var(--lavender); }
+
+  .loading-row{ display:flex; align-items:center; justify-content:center; gap:10px; padding:60px 0; color:var(--muted); font-size:14px; }
+  .spinner{ width:18px; height:18px; border-radius:50%; border:2.5px solid var(--card-edge); border-top-color: var(--purple); animation: spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">TF</div>
+      <div class="brand-text">
+        <div class="name">TechFashy</div>
+        <div class="sub">Device Finder</div>
+      </div>
+    </div>
+    <button class="gear-btn" id="openUpdate" title="Connect Google Sheet" aria-label="Connect Google Sheet">⚙</button>
+  </header>
+
+  <div class="status-line">
+    <h1>Find your next<br><span>phone.</span></h1>
+  </div>
+  <div class="meta-row" style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+    <span class="live-dot" id="liveDot" style="display:none;"></span>
+    <div class="meta" id="lastUpdated">Loading catalog…</div>
+    <button class="refresh-btn" id="refreshBtn" title="Refresh now" aria-label="Refresh now" style="display:none;">⟳</button>
+  </div>
+
+  <div class="connect-banner" id="connectBanner" style="display:none;">
+    <span>Connect a Google Sheet so prices update here automatically.</span>
+    <button id="connectBannerBtn">Connect</button>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="searchInput" placeholder="Search model, e.g. iPhone 15 Pro or Fold 6">
+  </div>
+
+  <button class="filter-toggle" id="filterToggle">
+    <span>Filters <span class="count-pill" id="activeFilterCount" style="display:none;">0</span></span>
+    <span class="chev" id="filterChev">⌄</span>
+  </button>
+
+  <div class="filters" id="filtersPanel">
+    <div class="filter-group">
+      <span class="filter-label">Brand</span>
+      <div class="chip-row" id="brandChips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Series</span>
+      <select id="seriesSelect"><option value="">All series</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Condition</span>
+      <div class="chip-row" id="conditionChips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Price range (₦) — optional</span>
+      <div class="price-row">
+        <input type="number" id="minPrice" placeholder="Min" inputmode="numeric">
+        <span>to</span>
+        <input type="number" id="maxPrice" placeholder="Max" inputmode="numeric">
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-clear" id="clearFilters">Clear all</button>
+      <button class="btn-apply" id="applyFilters">Show results</button>
+    </div>
+  </div>
+
+  <div class="results-head">
+    <div class="results-count" id="resultsCount">—</div>
+    <select class="sort-select" id="sortSelect">
+      <option value="price_asc">Price: Low to High</option>
+      <option value="price_desc">Price: High to Low</option>
+      <option value="name_asc">Name: A–Z</option>
+    </select>
+  </div>
+
+  <div id="gridContainer">
+    <div class="loading-row"><div class="spinner"></div> Loading catalog…</div>
+  </div>
+
+  <footer>
+    <button class="update-link" id="openUpdate2">Update price list</button>
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Connect your Google Sheet</h3>
+    <p class="desc">Paste the Web App URL from the TechFashy Apps Script (see setup guide). Once connected, editing the Sheet updates this app for everyone — no re-upload needed.</p>
+    <div class="modal-msg" id="modalMsg"></div>
+    <div class="field">
+      <label for="sheetUrl">Apps Script Web App URL</label>
+      <input type="text" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="closeModal">Cancel</button>
+      <button class="btn-upload" id="submitConnect">Connect &amp; sync</button>
+    </div>
+
+    <div class="divider-line"></div>
+
+    <details class="manual-fallback">
+      <summary>Or upload a price list file manually instead</summary>
+      <div class="field" style="margin-top:14px;">
+        <label for="passcode">Update passcode</label>
+        <input type="password" id="passcode" placeholder="Enter passcode">
+      </div>
+      <div class="field">
+        <label for="fileInput">Price list file (.xlsx)</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+        <div class="spec-note">Columns needed: Brand, Series, Model, Condition, Price (NGN), Category (New/Used).</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-upload" id="submitUpload" style="flex:1;">Upload &amp; replace</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+const SEED_DATA = [{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 6 128gb","Condition":"Brand New","Price (NGN)":400000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 6 256gb","Condition":"Brand New","Price (NGN)":430000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 6 Pro 128gb","Condition":"Brand New","Price (NGN)":500000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 6 Pro 256gb","Condition":"Brand New","Price (NGN)":550000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 7 128gb","Condition":"Brand New","Price (NGN)":450000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 7 256gb","Condition":"Brand New","Price (NGN)":500000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 7 Pro 128gb","Condition":"Brand New","Price (NGN)":570000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 7 Pro 256gb","Condition":"Brand New","Price (NGN)":600000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 8 128gb","Condition":"Brand New","Price (NGN)":530000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 8 256gb","Condition":"Brand New","Price (NGN)":590000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 8 Pro 128gb","Condition":"Brand New","Price (NGN)":660000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 8 Pro 256gb","Condition":"Brand New","Price (NGN)":720000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 9 128gb","Condition":"Brand New","Price (NGN)":750000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 9 256gb","Condition":"Brand New","Price (NGN)":800000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 9 Pro 256gb","Condition":"Brand New","Price (NGN)":950000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 10 128gb","Condition":"Brand New","Price (NGN)":870000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 10 Pro 128gb","Condition":"Brand New","Price (NGN)":930000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 10 Pro Fold 512gb","Condition":"Brand New","Price (NGN)":1850000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 10 Pro XL 256gb","Condition":"Brand New","Price (NGN)":1280000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 10 Pro XL 512gb","Condition":"Brand New","Price (NGN)":1500000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 9 Pro XL 256gb","Condition":"Brand New","Price (NGN)":950000,"Category":"New"},{"Brand":"Google","Series":"Google Pixel","Model":"Pixel 9 Pro XL 512gb","Condition":"Brand New","Price (NGN)":1140000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S23 Ultra 256gb","Condition":"Brand New","Price (NGN)":730000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S23 Ultra 512gb","Condition":"Brand New","Price (NGN)":850000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S24 Ultra 256gb","Condition":"Brand New","Price (NGN)":1000000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S24 Ultra 512gb","Condition":"Brand New","Price (NGN)":1050000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S25 Ultra 256gb","Condition":"Brand New","Price (NGN)":1200000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S25 Ultra 512gb","Condition":"Brand New","Price (NGN)":1320000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"S25 Ultra 1TB","Condition":"Brand New","Price (NGN)":1440000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 5 256gb","Condition":"Brand New","Price (NGN)":850000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 5 512gb","Condition":"Brand New","Price (NGN)":870000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 5 1TB","Condition":"Brand New","Price (NGN)":950000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 6 256gb","Condition":"Brand New","Price (NGN)":1100000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 6 512gb","Condition":"Brand New","Price (NGN)":1150000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 6 1TB","Condition":"Brand New","Price (NGN)":1250000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 7 256gb","Condition":"Brand New","Price (NGN)":1600000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 7 512gb","Condition":"Brand New","Price (NGN)":1750000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 7 1TB","Condition":"Brand New","Price (NGN)":2250000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy","Model":"Fold 7 1TB Dual Sim","Condition":"Brand New","Price (NGN)":2300000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":620000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":660000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Plus 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":640000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Plus 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":690000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Pro 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":790000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Pro 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":830000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Pro 512gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":870000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Pro Max 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":880000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 14 Series","Model":"14 Pro Max 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":950000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 128gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":780000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 256gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":820000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Plus 128gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":810000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Plus 256gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":860000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro 128gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":940000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro 256gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":1000000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro 512gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":1050000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro Max 256gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":1120000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro Max 512gb","Condition":"Brand New (Zero Battery Count)","Price (NGN)":1190000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 15 Series","Model":"15 Pro Max 1TB","Condition":"Brand New (Zero Battery Count)","Price (NGN)":1240000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1010000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 Plus 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1070000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 Pro 128gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1270000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 Pro 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1350000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 Pro 1TB","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1470000,"Category":"New"},{"Brand":"Apple","Series":"iPhone 16 Series","Model":"16 Pro Max 256gb","Condition":"Brand New (EU eSIM/Physical)","Price (NGN)":1480000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10+","Condition":"New","Price (NGN)":385000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10","Condition":"New","Price (NGN)":355000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10E","Condition":"New","Price (NGN)":320000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S9+","Condition":"New","Price (NGN)":310000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S9","Condition":"New","Price (NGN)":290000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S8+","Condition":"New","Price (NGN)":295000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S8","Condition":"New","Price (NGN)":280000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note8","Condition":"New","Price (NGN)":310000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note9","Condition":"New","Price (NGN)":325000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note10 (original pen)","Condition":"New","Price (NGN)":360000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note10+ (original pen)","Condition":"New","Price (NGN)":430000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20 FE 5G","Condition":"New","Price (NGN)":365000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20","Condition":"New","Price (NGN)":405000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20+","Condition":"New","Price (NGN)":415000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20 Ultra","Condition":"New","Price (NGN)":470000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20","Condition":"New","Price (NGN)":425000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20 Ultra 128gb (original pen)","Condition":"New","Price (NGN)":485000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20 Ultra 256gb (original pen)","Condition":"New","Price (NGN)":505000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 128gb","Condition":"New","Price (NGN)":370000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 256gb","Condition":"New","Price (NGN)":380000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21+ 128gb","Condition":"New","Price (NGN)":380000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21+ 256gb","Condition":"New","Price (NGN)":395000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 Ultra 128gb (original LCD)","Condition":"New","Price (NGN)":460000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 Ultra 256gb (original LCD)","Condition":"New","Price (NGN)":510000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 128gb","Condition":"New","Price (NGN)":420000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 256gb","Condition":"New","Price (NGN)":440000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22+ 128gb","Condition":"New","Price (NGN)":445000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22+ 256gb","Condition":"New","Price (NGN)":470000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 Ultra 128gb (original pen)","Condition":"New","Price (NGN)":580000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 Ultra 256gb (original pen)","Condition":"New","Price (NGN)":640000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S23 128gb","Condition":"New","Price (NGN)":520000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S23 256gb","Condition":"New","Price (NGN)":570000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S23+ 256gb","Condition":"New","Price (NGN)":600000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S23 Ultra 256gb","Condition":"New","Price (NGN)":760000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S23 Ultra 512gb","Condition":"New","Price (NGN)":820000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S24 128gb","Condition":"New","Price (NGN)":680000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S24 256gb","Condition":"New","Price (NGN)":700000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S24+ 256gb","Condition":"New","Price (NGN)":690000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S24 Ultra 256gb","Condition":"New","Price (NGN)":1000000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S24 Ultra 512gb","Condition":"New","Price (NGN)":1050000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S25 128gb","Condition":"New","Price (NGN)":750000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S25 256gb","Condition":"New","Price (NGN)":850000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S25+ 256gb","Condition":"New","Price (NGN)":950000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S25 Ultra 256gb","Condition":"New","Price (NGN)":1200000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S25 Ultra 512gb","Condition":"New","Price (NGN)":1280000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S26 Ultra 256gb","Condition":"New","Price (NGN)":1610000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S26 Ultra 512gb","Condition":"New","Price (NGN)":1740000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold3 256gb","Condition":"New","Price (NGN)":650000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold3 512gb","Condition":"New","Price (NGN)":680000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold4 256gb","Condition":"New","Price (NGN)":700000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold4 512gb","Condition":"New","Price (NGN)":730000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold5 256gb","Condition":"New","Price (NGN)":840000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold5 512gb","Condition":"New","Price (NGN)":880000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold6 256gb","Condition":"New","Price (NGN)":1100000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold6 512gb","Condition":"New","Price (NGN)":1150000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold7 256gb","Condition":"New","Price (NGN)":1600000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Fold7 512gb","Condition":"New","Price (NGN)":1750000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Zflip3 256gb","Condition":"New","Price (NGN)":410000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Zflip4 256gb","Condition":"New","Price (NGN)":440000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Zflip5 256gb","Condition":"New","Price (NGN)":530000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Zflip6 256gb","Condition":"New","Price (NGN)":610000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Zflip7 256gb","Condition":"New","Price (NGN)":850000,"Category":"New"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S8","Condition":"UK Used","Price (NGN)":240000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S8+","Condition":"UK Used","Price (NGN)":255000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S9","Condition":"UK Used","Price (NGN)":250000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S9+","Condition":"UK Used","Price (NGN)":270000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10E","Condition":"UK Used","Price (NGN)":280000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10","Condition":"UK Used","Price (NGN)":315000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S10+","Condition":"UK Used","Price (NGN)":345000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20","Condition":"UK Used","Price (NGN)":315000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20+","Condition":"UK Used","Price (NGN)":320000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S20 Ultra","Condition":"UK Used","Price (NGN)":375000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note8","Condition":"UK Used","Price (NGN)":270000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note9","Condition":"UK Used","Price (NGN)":290000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note10","Condition":"UK Used","Price (NGN)":320000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note10+","Condition":"UK Used","Price (NGN)":385000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20","Condition":"UK Used","Price (NGN)":330000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20 Ultra 128gb","Condition":"UK Used","Price (NGN)":455000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"Note20 Ultra 256gb","Condition":"UK Used","Price (NGN)":460000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 128gb","Condition":"UK Used","Price (NGN)":330000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 256gb","Condition":"UK Used","Price (NGN)":340000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21+ 128gb","Condition":"UK Used","Price (NGN)":335000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21+ 256gb","Condition":"UK Used","Price (NGN)":350000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 Ultra 128gb","Condition":"UK Used","Price (NGN)":400000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S21 Ultra 256gb","Condition":"UK Used","Price (NGN)":465000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 128gb","Condition":"UK Used","Price (NGN)":380000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 256gb","Condition":"UK Used","Price (NGN)":400000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22+ 128gb","Condition":"UK Used","Price (NGN)":400000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22+ 256gb","Condition":"UK Used","Price (NGN)":425000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 Ultra 128gb","Condition":"UK Used","Price (NGN)":540000,"Category":"Used"},{"Brand":"Samsung","Series":"Samsung Galaxy (Older/Classic)","Model":"S22 Ultra 256gb","Condition":"UK Used","Price (NGN)":600000,"Category":"Used"}]
+;
+const UPDATE_PASSCODE = "techfashy2026";
+const STORAGE_KEY = "catalog_v1";
+const META_KEY = "catalog_v1_meta";
+const SHEET_URL_KEY = "sheet_api_url";
+const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbxa0hpARlvqtevIpThk7rwsGTRtPCfEzZcxFXph1sQr-UZdeBcXgKhKgY4FiBE3nHQxJg/exec";
+
+let allDevices = [];
+let sheetUrl = null;
+let activeFilters = { brand: "All", condition: "All", series: "", min: null, max: null, q: "" };
+
+function money(n){ return "₦" + Number(n).toLocaleString("en-NG"); }
+
+function setLiveState(isLive, timestampText){
+  document.getElementById('liveDot').style.display = isLive ? 'inline-block' : 'none';
+  document.getElementById('refreshBtn').style.display = isLive ? 'inline-block' : 'none';
+  document.getElementById('lastUpdated').textContent = timestampText;
+  document.getElementById('connectBanner').style.display = isLive ? 'none' : 'flex';
+}
+
+// Google Apps Script Web Apps don't send CORS headers, and this environment
+// only allows loading external <script> tags from cdnjs (so JSONP won't load
+// either). We route through public CORS relays that add the missing headers.
+const CORS_PROXIES = [
+  (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+];
+
+async function fetchFromSheet(url){
+  const target = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+  let lastErr = null;
+
+  for(const makeProxyUrl of CORS_PROXIES){
+    try{
+      const res = await fetch(makeProxyUrl(target));
+      if(!res.ok) throw new Error('Request failed (status ' + res.status + ')');
+      const text = await res.text();
+      let data;
+      try{ data = JSON.parse(text); }
+      catch(e){ throw new Error('Unexpected response — the deployment may not be returning JSON.'); }
+      if(data.error) throw new Error(data.error);
+      if(!Array.isArray(data.devices) || data.devices.length === 0){
+        throw new Error('Sheet returned no devices — check the "All Devices" tab.');
+      }
+      return data;
+    } catch(e){
+      lastErr = e;
+    }
+  }
+  throw new Error((lastErr && lastErr.message) || 'Could not reach that URL — check the deployment is live.');
+}
+
+async function loadCatalog(){
+  // 1. Do we have a connected Google Sheet? Check saved config first, else fall back to the built-in default.
+  try{
+    const urlRes = await window.storage.get(SHEET_URL_KEY, true);
+    if(urlRes && urlRes.value){
+      sheetUrl = urlRes.value;
+    } else if(DEFAULT_SHEET_URL){
+      sheetUrl = DEFAULT_SHEET_URL;
+      await window.storage.set(SHEET_URL_KEY, DEFAULT_SHEET_URL, true).catch(()=>{});
+    }
+  } catch(e){
+    if(DEFAULT_SHEET_URL) sheetUrl = DEFAULT_SHEET_URL;
+  }
+
+  if(sheetUrl){
+    try{
+      const data = await fetchFromSheet(sheetUrl);
+      allDevices = data.devices;
+      await window.storage.set(STORAGE_KEY, JSON.stringify(allDevices), true).catch(()=>{});
+      await window.storage.set(META_KEY, JSON.stringify({updatedAt: data.updatedAt || Date.now()}), true).catch(()=>{});
+      setLiveState(true, `Live from Google Sheet · synced ${new Date(data.updatedAt || Date.now()).toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})}`);
+      buildFilterOptions(); renderResults();
+      return;
+    } catch(e){
+      console.warn('Sheet sync failed, falling back to cache:', e.message);
+    }
+  }
+
+  // 2. Fall back to last cached shared data
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    const meta = await window.storage.get(META_KEY, true).catch(()=>null);
+    if(res && res.value){
+      allDevices = JSON.parse(res.value);
+      const ts = meta && meta.value ? JSON.parse(meta.value).updatedAt : null;
+      setLiveState(!!sheetUrl, sheetUrl ? `Showing cached data — sync failed, will retry` : (ts ? `Catalog updated ${new Date(ts).toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'})}` : `${allDevices.length} devices in stock`));
+    } else {
+      throw new Error("no cached data");
+    }
+  } catch(e){
+    // 3. Last resort: bundled seed data
+    allDevices = SEED_DATA;
+    setLiveState(false, `${allDevices.length} devices in stock`);
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(SEED_DATA), true);
+      await window.storage.set(META_KEY, JSON.stringify({updatedAt: Date.now()}), true);
+    } catch(err){ /* seeding is best-effort */ }
+  }
+  buildFilterOptions();
+  renderResults();
+}
+
+function buildFilterOptions(){
+  const brands = ["All", ...new Set(allDevices.map(d => d.Brand))];
+  const brandChips = document.getElementById('brandChips');
+  brandChips.innerHTML = brands.map(b => `<button class="chip ${b===activeFilters.brand?'active':''}" data-brand="${b}">${b}</button>`).join('');
+
+  const conditions = ["All", "New", "Used"];
+  const condChips = document.getElementById('conditionChips');
+  condChips.innerHTML = conditions.map(c => `<button class="chip ${c===activeFilters.condition?'active':''}" data-cond="${c}">${c}</button>`).join('');
+
+  refreshSeriesOptions();
+
+  brandChips.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      activeFilters.brand = chip.dataset.brand;
+      activeFilters.series = "";
+      brandChips.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      refreshSeriesOptions();
+    });
+  });
+  condChips.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      activeFilters.condition = chip.dataset.cond;
+      condChips.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+}
+
+function refreshSeriesOptions(){
+  const seriesSelect = document.getElementById('seriesSelect');
+  const pool = activeFilters.brand === "All" ? allDevices : allDevices.filter(d=>d.Brand===activeFilters.brand);
+  const series = [...new Set(pool.map(d=>d.Series))].sort();
+  seriesSelect.innerHTML = `<option value="">All series</option>` + series.map(s=>`<option value="${s}">${s}</option>`).join('');
+  seriesSelect.value = activeFilters.series;
+}
+
+function countActiveFilters(){
+  let n = 0;
+  if(activeFilters.brand !== "All") n++;
+  if(activeFilters.condition !== "All") n++;
+  if(activeFilters.series) n++;
+  if(activeFilters.min) n++;
+  if(activeFilters.max) n++;
+  return n;
+}
+
+function getFiltered(){
+  const q = activeFilters.q.trim().toLowerCase();
+  return allDevices.filter(d=>{
+    if(activeFilters.brand !== "All" && d.Brand !== activeFilters.brand) return false;
+    if(activeFilters.condition !== "All" && d.Category !== activeFilters.condition) return false;
+    if(activeFilters.series && d.Series !== activeFilters.series) return false;
+    if(activeFilters.min && d["Price (NGN)"] < Number(activeFilters.min)) return false;
+    if(activeFilters.max && d["Price (NGN)"] > Number(activeFilters.max)) return false;
+    if(q){
+      const hay = `${d.Brand} ${d.Series} ${d.Model} ${d.Condition}`.toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderResults(){
+  let list = getFiltered();
+  const sort = document.getElementById('sortSelect').value;
+  if(sort === "price_asc") list.sort((a,b)=> a["Price (NGN)"] - b["Price (NGN)"]);
+  else if(sort === "price_desc") list.sort((a,b)=> b["Price (NGN)"] - a["Price (NGN)"]);
+  else if(sort === "name_asc") list.sort((a,b)=> `${a.Brand}${a.Model}`.localeCompare(`${b.Brand}${b.Model}`));
+
+  document.getElementById('resultsCount').innerHTML = `<strong>${list.length}</strong> device${list.length===1?'':'s'} found`;
+
+  const n = countActiveFilters();
+  const pill = document.getElementById('activeFilterCount');
+  if(n>0){ pill.style.display='inline-block'; pill.textContent = n; } else { pill.style.display='none'; }
+
+  const grid = document.getElementById('gridContainer');
+  if(list.length === 0){
+    grid.innerHTML = `<div class="empty-state"><div class="big">📵</div><p>No devices match those filters. Try a wider price range or clear a filter.</p></div>`;
+    return;
+  }
+  grid.innerHTML = `<div class="grid">` + list.map(d => `
+    <div class="device-card">
+      <div class="tag">${d.Brand} · ${d.Series}</div>
+      <div class="model">${d.Model}</div>
+      <div class="cond ${d.Category==='Used'?'used':'new'}">${d.Condition}</div>
+      <div class="ticket"><div class="hole"></div><div class="price">${money(d["Price (NGN)"])}</div></div>
+    </div>
+  `).join('') + `</div>`;
+}
+
+// event wiring
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  activeFilters.q = e.target.value;
+  renderResults();
+});
+document.getElementById('seriesSelect').addEventListener('change', (e)=>{
+  activeFilters.series = e.target.value;
+});
+document.getElementById('minPrice').addEventListener('input', (e)=> activeFilters.min = e.target.value);
+document.getElementById('maxPrice').addEventListener('input', (e)=> activeFilters.max = e.target.value);
+document.getElementById('sortSelect').addEventListener('change', renderResults);
+
+document.getElementById('filterToggle').addEventListener('click', ()=>{
+  const panel = document.getElementById('filtersPanel');
+  const chev = document.getElementById('filterChev');
+  panel.classList.toggle('open');
+  chev.classList.toggle('open');
+});
+document.getElementById('applyFilters').addEventListener('click', ()=>{
+  renderResults();
+  document.getElementById('filtersPanel').classList.remove('open');
+  document.getElementById('filterChev').classList.remove('open');
+});
+document.getElementById('clearFilters').addEventListener('click', ()=>{
+  activeFilters = { brand: "All", condition: "All", series: "", min: null, max: null, q: activeFilters.q };
+  document.getElementById('minPrice').value = "";
+  document.getElementById('maxPrice').value = "";
+  buildFilterOptions();
+  renderResults();
+});
+
+// modal
+const overlay = document.getElementById('modalOverlay');
+function openModal(){
+  overlay.classList.add('open');
+  document.getElementById('modalMsg').className='modal-msg';
+  if(sheetUrl) document.getElementById('sheetUrl').value = sheetUrl;
+}
+function closeModalFn(){ overlay.classList.remove('open'); }
+document.getElementById('openUpdate').addEventListener('click', openModal);
+document.getElementById('openUpdate2').addEventListener('click', openModal);
+document.getElementById('connectBannerBtn').addEventListener('click', openModal);
+document.getElementById('closeModal').addEventListener('click', closeModalFn);
+overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModalFn(); });
+
+document.getElementById('refreshBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  await loadCatalog();
+  btn.classList.remove('spinning');
+});
+
+document.getElementById('submitConnect').addEventListener('click', async ()=>{
+  const msg = document.getElementById('modalMsg');
+  const urlInput = document.getElementById('sheetUrl').value.trim();
+  const btn = document.getElementById('submitConnect');
+
+  if(!urlInput.startsWith('https://script.google.com/')){
+    msg.textContent = "That doesn't look like an Apps Script Web App URL (should start with https://script.google.com/...).";
+    msg.className = "modal-msg error show";
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "Testing connection…";
+  try{
+    const data = await fetchFromSheet(urlInput);
+    await window.storage.set(SHEET_URL_KEY, urlInput, true);
+    await window.storage.set(STORAGE_KEY, JSON.stringify(data.devices), true);
+    await window.storage.set(META_KEY, JSON.stringify({updatedAt: data.updatedAt || Date.now()}), true);
+    sheetUrl = urlInput;
+    allDevices = data.devices;
+    buildFilterOptions();
+    renderResults();
+    setLiveState(true, `Live from Google Sheet · synced just now`);
+    msg.textContent = `Connected — pulled ${data.devices.length} devices from your Sheet.`;
+    msg.className = "modal-msg success show";
+    setTimeout(closeModalFn, 1400);
+  } catch(err){
+    msg.textContent = "Couldn't reach that Sheet: " + err.message;
+    msg.className = "modal-msg error show";
+  } finally {
+    btn.disabled = false; btn.textContent = "Connect & sync";
+  }
+});
+
+document.getElementById('submitUpload').addEventListener('click', async ()=>{
+  const msg = document.getElementById('modalMsg');
+  const pass = document.getElementById('passcode').value;
+  const file = document.getElementById('fileInput').files[0];
+  const btn = document.getElementById('submitUpload');
+
+  if(pass !== UPDATE_PASSCODE){
+    msg.textContent = "Incorrect passcode."; msg.className = "modal-msg error show"; return;
+  }
+  if(!file){
+    msg.textContent = "Choose an .xlsx file first."; msg.className = "modal-msg error show"; return;
+  }
+
+  btn.disabled = true; btn.textContent = "Uploading…";
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:"array"});
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes("all")) || wb.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+
+    const normalized = rows.map(r=>{
+      const get = (keys) => { for(const k of keys){ if(r[k] !== undefined) return r[k]; } return undefined; };
+      const brand = get(["Brand","brand"]);
+      const series = get(["Series","series"]);
+      const model = get(["Model","model"]);
+      const condition = get(["Condition","condition"]);
+      const price = get(["Price (NGN)","Price","price"]);
+      let category = get(["Category","category"]);
+      if(!category){ category = String(condition||"").toLowerCase().includes("used") ? "Used" : "New"; }
+      return { Brand: brand, Series: series, Model: model, Condition: condition, "Price (NGN)": Number(price), Category: category };
+    }).filter(r => r.Brand && r.Model && !isNaN(r["Price (NGN)"]));
+
+    if(normalized.length === 0){
+      throw new Error("No valid rows found — check the column headers match Brand, Series, Model, Condition, Price (NGN).");
+    }
+
+    await window.storage.set(STORAGE_KEY, JSON.stringify(normalized), true);
+    await window.storage.set(META_KEY, JSON.stringify({updatedAt: Date.now()}), true);
+
+    allDevices = normalized;
+    activeFilters = { brand: "All", condition: "All", series: "", min: null, max: null, q: "" };
+    document.getElementById('searchInput').value = "";
+    document.getElementById('minPrice').value = "";
+    document.getElementById('maxPrice').value = "";
+    buildFilterOptions();
+    renderResults();
+    setLiveState(!!sheetUrl, `Catalog updated ${new Date().toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'})}`);
+
+    msg.textContent = `Catalog updated — ${normalized.length} devices are now live.`;
+    msg.className = "modal-msg success show";
+    setTimeout(closeModalFn, 1600);
+  } catch(err){
+    msg.textContent = err.message || "Something went wrong reading that file.";
+    msg.className = "modal-msg error show";
+  } finally {
+    btn.disabled = false; btn.textContent = "Upload & replace";
+  }
+});
+
+loadCatalog();
+</script>
+</body>
+</html>
